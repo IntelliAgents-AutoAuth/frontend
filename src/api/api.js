@@ -52,6 +52,10 @@ export const casesApi = {
     const response = await api.post('/cases/', payload);
     return response.data;
   },
+  syncEhr: async (caseId) => {
+    const response = await api.post(`/cases/${caseId}/sync`);
+    return response.data;
+  },
 };
 
 export default api;
