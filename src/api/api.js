@@ -44,6 +44,10 @@ export const casesApi = {
     const response = await api.get('/cases/');
     return response.data;
   },
+  fetchCaseById: async (caseId) => {
+    const response = await api.get(`/cases/${caseId}`);
+    return response.data;
+  },
   createCase: async (payload) => {
     const response = await api.post('/cases/', payload);
     return response.data;

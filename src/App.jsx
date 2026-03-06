@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import NewCase from './pages/NewCase';
 import EhrPrefill from './pages/EhrPrefill';
+import CaseDetails from './pages/CaseDetails';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/new-case" element={<NewCase />} />
         <Route path="/cases/:id/prefill" element={<EhrPrefill />} />
+        <Route path="/cases/:id" element={<CaseDetails />} />
         {/* Wildcard to redirect back to login for now */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
