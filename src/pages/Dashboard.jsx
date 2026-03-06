@@ -12,12 +12,12 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const storedUser = sessionStorage.getItem('user');
+    const storedUser = localStorage.getItem('user');
     
     // Robust check for missing or invalid user data
     if (!storedUser || storedUser === 'undefined') {
       console.warn('Authentication data missing or corrupted. Redirecting to login.');
-      sessionStorage.clear();
+      localStorage.clear();
       navigate('/login');
       return;
     }
@@ -26,7 +26,7 @@ const Dashboard = () => {
       setUser(JSON.parse(storedUser));
     } catch (err) {
       console.error('Failed to parse user session data:', err);
-      sessionStorage.clear();
+      localStorage.clear();
       navigate('/login');
       return;
     }
@@ -46,7 +46,7 @@ const Dashboard = () => {
   }, [navigate]);
 
   const handleLogout = () => {
-    sessionStorage.clear();
+    localStorage.clear();
     navigate('/login');
   };
 

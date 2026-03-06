@@ -38,7 +38,7 @@ const NewCase = () => {
   return (
     <div className="min-h-screen bg-mesh flex items-center justify-center p-6 font-sans">
       <div className="w-full max-w-xl glass-card rounded-[2.5rem] border border-white/60 overflow-hidden fade-in relative">
-        
+
         {/* Modal Header */}
         <div className="px-6 sm:px-10 py-6 sm:py-8 border-b border-slate-50 flex items-center justify-between bg-white/40">
           <div className="min-w-0">
@@ -52,11 +52,11 @@ const NewCase = () => {
 
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-6 sm:p-10 space-y-6 sm:space-y-8 bg-white/20">
-          
+
           <div className="space-y-2.5">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] ml-1">Patient Identifier (MRN)</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               className="input-field h-14 text-base font-bold text-slate-700"
               placeholder="e.g. MRN-12345"
               value={patientId}
@@ -67,8 +67,8 @@ const NewCase = () => {
 
           <div className="space-y-2.5">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] ml-1">CPT Procedure Code</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               className="input-field h-14 text-base font-bold text-slate-700"
               placeholder="e.g. 75563"
               value={cptCode}
@@ -79,8 +79,8 @@ const NewCase = () => {
 
           <div className="space-y-2.5">
             <label className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] ml-1">Insurance Provider Name</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               className="input-field h-14 text-base font-bold text-slate-700"
               placeholder="e.g. Aetna, United Healthcare"
               value={insuranceName}
@@ -98,15 +98,15 @@ const NewCase = () => {
 
           {/* Modal Footer Actions */}
           <div className="pt-6 sm:pt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-5">
-            <button 
+            <button
               type="button"
               onClick={() => navigate('/dashboard')}
               className="btn-secondary h-14 px-10 border-transparent bg-slate-100/50 hover:bg-slate-100 order-2 sm:order-1"
             >
               Cancel
             </button>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={loading}
               className="btn-primary h-14 px-12 text-base order-1 sm:order-2"
             >
@@ -121,7 +121,7 @@ const NewCase = () => {
       </div>
 
       <div className="absolute bottom-10 text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] opacity-40 animate-pulse">
-         Protocol Enforced • PHI Encrypted Bridge Active
+        Protocol Enforced • PHI Encrypted Bridge Active
       </div>
     </div>
   );
