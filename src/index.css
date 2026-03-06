@@ -1,1 +1,125 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap');
+
+:root {
+  --primary: #38A3A5;
+  --primary-soft: rgba(56, 163, 165, 0.08);
+  --bg-main: #FDFDFD;
+  --text-main: #475569;
+  --text-bold: #0F172A;
+  --border-ultra: rgba(226, 232, 240, 0.5);
+
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+}
+
+@layer components {
+  .btn-primary {
+    @apply relative overflow-hidden font-semibold py-3.5 px-8 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2 text-white;
+    background: linear-gradient(135deg, #38A3A5 0%, #2D8284 100%);
+    box-shadow:
+      0 10px 25px -5px rgba(56, 163, 165, 0.4),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .btn-primary:hover {
+    @apply -translate-y-0.5;
+    background: linear-gradient(135deg, #42B4B6 0%, #38A3A5 100%);
+    box-shadow:
+      0 15px 30px -5px rgba(56, 163, 165, 0.5),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
+  }
+
+  .btn-primary:active {
+    @apply scale-95;
+    background: #2D8284;
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+  }
+
+  .btn-secondary {
+    @apply bg-white border border-slate-200 hover:border-[#38A3A5]/50 text-slate-500 hover:text-[#38A3A5] font-semibold py-3 px-8 rounded-2xl transition-all duration-300 flex items-center justify-center gap-2;
+  }
+
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-2xl border border-white shadow-[0_20px_40px_rgba(0,0,0,0.02),0_1px_3px_rgba(0,0,0,0.01)];
+  }
+
+  .input-field {
+    @apply w-full bg-slate-50/50 border border-slate-100/80 rounded-2xl py-3.5 px-5 focus:outline-none focus:ring-4 focus:ring-[#38A3A5]/5 focus:border-[#38A3A5]/40 transition-all duration-300 placeholder-slate-300 text-slate-600 text-sm;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 px-5 py-3.5 rounded-2xl text-slate-400 hover:text-[#38A3A5] hover:bg-[#38A3A5]/5 transition-all duration-300 font-medium text-[13px];
+  }
+
+  .sidebar-link-active {
+    @apply bg-[#38A3A5] text-white shadow-xl shadow-[#38A3A5]/20 hover:text-white hover:bg-[#38A3A5];
+  }
+}
+
+/* Premium Enhancements */
+.bg-mesh {
+  background-color: #f8fafc;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(56, 163, 165, 0.05) 0px, transparent 40%),
+    radial-gradient(at 100% 100%, rgba(56, 163, 165, 0.05) 0px, transparent 40%);
+  position: relative;
+}
+
+.bg-mesh::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(56, 163, 165, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.fade-in {
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
