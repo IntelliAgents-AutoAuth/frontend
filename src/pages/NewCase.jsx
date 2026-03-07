@@ -29,9 +29,9 @@ const NewCase = () => {
 
     try {
       const response = await casesApi.createCase({
-        patientName: patientId, // Using Patient ID as the identifier
-        cptCode: cptCode || 'Not Provided',
-        insuranceName: insuranceName || 'Not Provided'
+        patient_id: patientId,
+        cpt_code: cptCode || undefined,
+        insurance_company: insuranceName || undefined
       });
       navigate(`/cases/${response.case_id}/prefill`);
     } catch (err) {
@@ -50,12 +50,12 @@ const NewCase = () => {
       <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-[#38A3A5] rounded-full mix-blend-multiply filter blur-[128px] opacity-10 pointer-events-none" />
 
       <div className="w-full max-w-2xl fade-in relative z-10">
-        
+
         {/* Top Header outside card */}
         <div className="flex items-center justify-between mb-8 px-2">
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => navigate('/dashboard')} 
+            <button
+              onClick={() => navigate('/dashboard')}
               className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 shadow-sm transition-all"
             >
               <ChevronLeft size={22} strokeWidth={2.5} />
@@ -71,7 +71,7 @@ const NewCase = () => {
         </div>
 
         <div className="bg-white/90 backdrop-blur-xl rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] border border-white/60 relative overflow-hidden">
-          
+
           {/* Subtle Top Accent */}
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#38A3A5]/40 to-transparent" />
 
@@ -163,7 +163,7 @@ const NewCase = () => {
         </div>
 
         <div className="mt-8 text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] opacity-60 text-center flex items-center justify-center gap-2">
-           HIPAA & HITRUST Protocol Active <div className="w-1.5 h-1.5 rounded-full bg-[#38A3A5]"></div>
+          HIPAA & HITRUST Protocol Active <div className="w-1.5 h-1.5 rounded-full bg-[#38A3A5]"></div>
         </div>
       </div>
     </div>

@@ -56,7 +56,7 @@ export const authApi = {
 
 export const casesApi = {
   fetchCases: async () => {
-    const response = await api.get('/cases/');
+    const response = await api.get('/cases');
     return response.data;
   },
   fetchCaseById: async (caseId) => {
@@ -64,7 +64,7 @@ export const casesApi = {
     return response.data;
   },
   createCase: async (payload) => {
-    const response = await api.post('/cases/', payload);
+    const response = await api.post('/cases', payload);
     return response.data;
   },
   syncEhr: async (caseId) => {
