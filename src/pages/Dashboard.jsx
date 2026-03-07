@@ -13,11 +13,35 @@ const Dashboard = () => {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
+    const storedToken = localStorage.getItem('token');
     
     // Robust check for missing or invalid user data
-    if (!storedUser || storedUser === 'undefined') {
+    if (!storedUser || storedUser === 'undefined' || !storedToken) {
       console.warn('Authentication data missing or corrupted. Redirecting to login.');
       localStorage.clear();
+      navigate('/login');
+      return;
+    }
+
+    // Check token expiration
+    try {
+      const payloadBase64 = storedToken.split('.')[1];
+      if (payloadBase64) {
+        const decodedPayload = JSON.parse(atob(payloadBase64));
+        const currentTime = Math.floor(Date.now() / 1000);
+        
+        if (decodedPayload.exp && decodedPayload.exp < currentTime) {
+          console.warn('Token has expired. Redirecting to login.');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          navigate('/login');
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to decode token:', err);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       navigate('/login');
       return;
     }
