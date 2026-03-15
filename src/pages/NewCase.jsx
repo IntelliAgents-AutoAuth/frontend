@@ -29,9 +29,9 @@ const NewCase = () => {
 
     try {
       const response = await casesApi.createCase({
-        patientName: patientId, // Using Patient ID as the identifier
-        cptCode: cptCode || 'Not Provided',
-        insuranceName: insuranceName || 'Not Provided'
+        patient_id: patientId,
+        cpt_code: cptCode || undefined,
+        insurance_company: insuranceName || undefined,
       });
       navigate(`/cases/${response.case_id}/prefill`);
     } catch (err) {
