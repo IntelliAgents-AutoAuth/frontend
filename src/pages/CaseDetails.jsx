@@ -1,7 +1,236 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, User, Activity, FileText, CheckCircle2, FlaskConical, Building, Calendar, Phone, Fingerprint, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, User, Activity, FileText, CheckCircle2, FlaskConical, Building, Calendar, Phone, Fingerprint, ShieldCheck, AlertTriangle, UploadCloud, CheckCircle, RefreshCcw, Loader2 } from 'lucide-react';
 import { casesApi } from '../api/api';
+
+const GapAnalysisModule = ({ caseId, onUpdate }) => {
+  const [analysis, setAnalysis] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [formValues, setFormValues] = useState({});
+  const [submitting, setSubmitting] = useState({});
+  const [submittingAll, setSubmittingAll] = useState(false);
+
+  const fetchAnalysis = async () => {
+    try {
+      setLoading(true);
+      const data = await casesApi.fetchGapAnalysis(caseId);
+      setAnalysis(data);
+    } catch (err) {
+      console.error("Error fetching gap analysis:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAnalysis();
+  }, [caseId]);
+
+  const handleSync = async () => {
+    try {
+      setSyncing(true);
+      await casesApi.syncEhr(caseId);
+      await fetchAnalysis();
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      console.error("Sync failed:", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleInputChange = (docName, value) => {
+    setFormValues(prev => ({ ...prev, [docName]: value }));
+  };
+
+  const handleSubmitAll = async () => {
+    const docsToSubmit = analysis.missing_documents.filter(doc => formValues[doc.document_name]);
+    if (docsToSubmit.length === 0) return;
+
+    try {
+      setSubmittingAll(true);
+      
+      // Map all submissions to an array of promises
+      const uploadPromises = docsToSubmit.map(doc => {
+        const value = formValues[doc.document_name];
+        const isFile = doc.html_input_type === 'file';
+        const payload = {
+          document_name: doc.document_name,
+          missing_key: doc.document_name,
+          [isFile ? 'file_path' : 'field_value']: isFile ? `uploads/${value.name}` : value
+        };
+        return casesApi.uploadGapData(caseId, payload);
+      });
+
+      await Promise.all(uploadPromises);
+      
+      // Re-trigger sync to let agent verify new data
+      await handleSync();
+      
+    } catch (err) {
+      console.error("Bulk submission failed:", err);
+    } finally {
+      setSubmittingAll(false);
+    }
+  };
+
+  const handleSubmitField = async (doc) => {
+    const value = formValues[doc.document_name];
+    if (!value) return;
+
+    try {
+      setSubmitting(prev => ({ ...prev, [doc.document_name]: true }));
+      
+      const isFile = doc.html_input_type === 'file';
+      const payload = {
+        document_name: doc.document_name,
+        missing_key: doc.document_name, // Map it to the name for ehr_fetcher matching
+        [isFile ? 'file_path' : 'field_value']: isFile ? `uploads/${value.name}` : value
+      };
+
+      await casesApi.uploadGapData(caseId, payload);
+      
+      // Mark as staging complete in local UI
+      setFormValues(prev => ({ ...prev, [`${doc.document_name}_submitted`]: true }));
+      
+    } catch (err) {
+      console.error("Submission failed:", err);
+    } finally {
+      setSubmitting(prev => ({ ...prev, [doc.document_name]: false }));
+    }
+  };
+
+  if (loading) return <div className="p-8 text-center text-slate-400 animate-pulse text-xs font-bold uppercase tracking-widest">Aggregating Gaps...</div>;
+
+  if (!analysis || analysis.status === 'GAP_CLEARED' || !analysis.missing_documents || analysis.missing_documents.length === 0) {
+    return (
+      <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-8 text-center flex flex-col items-center gap-4">
+        <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
+           <CheckCircle size={32} />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-slate-900">Authorization Ready</h3>
+          <p className="text-sm text-slate-500 mt-1">All policy requirements have been satisfied.</p>
+        </div>
+        <button onClick={handleSync} className="text-xs font-bold text-[#38A3A5] uppercase tracking-widest hover:underline flex items-center gap-2">
+          {syncing ? <Loader2 size={12} className="animate-spin"/> : <RefreshCcw size={12}/>} Force Review
+        </button>
+      </div>
+    );
+  }
+
+  const stagedCount = (analysis?.missing_documents || []).filter(doc => formValues[doc.document_name]).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center">
+            <AlertTriangle size={20} strokeWidth={2.5} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-800 tracking-tight">Requirement Gaps</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stagedCount} of {analysis?.missing_documents?.length || 0} prepared</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {stagedCount > 0 && (
+            <button 
+              onClick={handleSubmitAll}
+              disabled={submittingAll || syncing}
+              className="flex items-center gap-2 px-6 py-2 bg-[#38A3A5] text-white rounded-xl shadow-lg shadow-[#38A3A5]/20 hover:shadow-[#38A3A5]/40 transition-all text-xs font-bold uppercase tracking-widest border border-[#38A3A5]"
+            >
+              {submittingAll ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+              Submit All ({stagedCount})
+            </button>
+          )}
+          <button 
+            onClick={handleSync}
+            disabled={syncing || submittingAll}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-600 rounded-xl transition-all text-xs font-bold uppercase tracking-widest"
+          >
+            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCcw size={14} />}
+            Sync Agent
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {(analysis?.missing_documents || []).map((doc, idx) => (
+          <div key={idx} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:border-[#38A3A5]/30 transition-all flex flex-col">
+            <div className="mb-4">
+              <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                {doc.label || doc.document_name}
+                {doc.is_mandatory && <span className="text-rose-500">*</span>}
+              </h4>
+              <p className="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">{doc.reason}</p>
+            </div>
+
+            <div className="mt-auto space-y-3">
+              {doc.html_input_type === 'file' ? (
+                <div className="relative group">
+                  <input 
+                    type="file" 
+                    id={`file-${idx}`}
+                    className="hidden" 
+                    accept={doc.accept}
+                    onChange={(e) => handleInputChange(doc.document_name, e.target.files[0])}
+                  />
+                  <label 
+                    htmlFor={`file-${idx}`}
+                    className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl p-4 cursor-pointer hover:border-[#38A3A5] hover:bg-slate-50 transition-all group"
+                  >
+                    <UploadCloud size={20} className="text-slate-300 group-hover:text-[#38A3A5] mb-2" />
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">
+                      {formValues[doc.document_name]?.name || 'Select File'}
+                    </span>
+                  </label>
+                </div>
+              ) : doc.html_input_type === 'textarea' ? (
+                <textarea 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-medium focus:ring-2 focus:ring-[#38A3A5]/20 focus:outline-none placeholder:text-slate-300"
+                  placeholder={doc.placeholder || 'Enter details...'}
+                  onChange={(e) => handleInputChange(doc.document_name, e.target.value)}
+                />
+              ) : doc.html_input_type === 'select' ? (
+                <select 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs font-bold text-slate-600 focus:outline-none"
+                  onChange={(e) => handleInputChange(doc.document_name, e.target.value)}
+                >
+                  <option value="">Select Option</option>
+                  {doc.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              ) : (
+                <input 
+                  type={doc.html_input_type || 'text'}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs font-bold text-slate-800 placeholder:text-slate-300 focus:outline-none"
+                  placeholder={doc.placeholder || 'Enter value...'}
+                  onChange={(e) => handleInputChange(doc.document_name, e.target.value)}
+                />
+              )}
+
+              <button 
+                onClick={() => handleSubmitField(doc)}
+                disabled={!formValues[doc.document_name] || submitting[doc.document_name] || formValues[`${doc.document_name}_submitted`]}
+                className={`w-full py-3 transition-all flex items-center justify-center rounded-2xl text-[10px] font-bold uppercase tracking-widest ${
+                  formValues[`${doc.document_name}_submitted`] 
+                  ? 'bg-emerald-500 text-white shadow-emerald-200 cursor-default' 
+                  : 'bg-slate-100 text-slate-400 hover:bg-slate-200 shadow-none disabled:opacity-50'
+                }`}
+              >
+                {submitting[doc.document_name] ? <Loader2 size={14} className="animate-spin" /> : (
+                  formValues[`${doc.document_name}_submitted`] ? <div className="flex items-center gap-2"><CheckCircle size={14}/> Staged</div> : 'Confirm Field'
+                )}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const CaseDetails = () => {
   const { id } = useParams();
@@ -158,6 +387,15 @@ const CaseDetails = () => {
           {/* Column 2 & 3: Clinical & Details */}
           <div className="lg:col-span-2 space-y-6 sm:space-y-8">
             
+            {/* NEW: Gap Analysis Integration */}
+            <GapAnalysisModule 
+              caseId={id} 
+              onUpdate={() => {
+                // Trigger a re-fetch of the main case data if needed
+                window.location.reload(); 
+              }} 
+            />
+
             {/* Clinical Overview */}
             <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] h-full">
               <div className="flex items-center gap-3 mb-8">
@@ -226,6 +464,7 @@ const CaseDetails = () => {
           <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mt-2">
              
              {/* Ordering Physician */}
+             {(caseData.physician_name || caseData.physician_npi || caseData.physician_specialty || caseData.facility_name) && (
              <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]">
                <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-500 flex items-center justify-center">
@@ -235,26 +474,36 @@ const CaseDetails = () => {
                </div>
                
                <div className="space-y-4 text-sm font-medium text-slate-600">
+                  {caseData.physician_name && (
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Physician</span>
-                     <span className="font-bold text-slate-800">{caseData.physician_name || 'N/A'}</span>
+                     <span className="font-bold text-slate-800">{caseData.physician_name}</span>
                   </div>
+                  )}
+                  {caseData.physician_npi && (
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">NPI Number</span>
-                     <span>{caseData.physician_npi || 'N/A'}</span>
+                     <span>{caseData.physician_npi}</span>
                   </div>
+                  )}
+                  {caseData.physician_specialty && (
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Specialty</span>
-                     <span>{caseData.physician_specialty || 'N/A'}</span>
+                     <span>{caseData.physician_specialty}</span>
                   </div>
+                  )}
+                  {caseData.facility_name && (
                   <div className="flex items-center justify-between pb-1">
                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Facility</span>
-                     <span>{caseData.facility_name || 'N/A'}</span>
+                     <span>{caseData.facility_name}</span>
                   </div>
+                  )}
                </div>
              </div>
+             )}
 
              {/* Diagnostics / Labs */}
+             {caseData.lab_results && Object.keys(caseData.lab_results).length > 0 && (
              <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] flex flex-col">
                <div className="flex items-center justify-between mb-6">
                  <div className="flex items-center gap-3">
@@ -276,7 +525,7 @@ const CaseDetails = () => {
                              {Object.entries(resultsMap).map(([key, value]) => (
                                <li key={key} className="text-xs flex items-center justify-between">
                                   <span className="text-slate-500 font-medium">{key}</span>
-                                  <span className="font-bold text-slate-700">{typeof value === 'object' ? `${value.value} ${value.unit}` : value}</span>
+                                  <span className="font-bold text-slate-700">{value && typeof value === 'object' ? `${value.value} ${value.unit}` : value}</span>
                                </li>
                              ))}
                            </ul>
@@ -291,6 +540,7 @@ const CaseDetails = () => {
                   )}
                </div>
              </div>
+             )}
           </div>
         </main>
       </div>

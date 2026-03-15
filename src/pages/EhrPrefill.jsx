@@ -4,7 +4,9 @@ import { ShieldCheck, Database, CheckCircle2 } from 'lucide-react';
 import { casesApi } from '../api/api';
 
 const DataField = ({ label, value, isLabs }) => {
-  const hasData = value && (!isLabs || Object.keys(value).length > 0);
+  const hasData = value && value !== 'N/A' && (!isLabs || Object.keys(value).length > 0);
+  
+  if (!hasData) return null;
   
   return (
     <div className="space-y-2 p-5 bg-slate-50/50 border border-slate-100 rounded-2xl relative group hover:border-[#38A3A5]/30 transition-all">

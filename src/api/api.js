@@ -71,6 +71,14 @@ export const casesApi = {
     const response = await api.post(`/cases/${caseId}/sync`);
     return response.data;
   },
+  fetchGapAnalysis: async (caseId) => {
+    const response = await api.get(`/cases/${caseId}/gap-analysis`);
+    return response.data;
+  },
+  uploadGapData: async (caseId, payload) => {
+    const response = await api.post(`/cases/${caseId}/upload`, payload);
+    return response.data;
+  },
 };
 
 export default api;

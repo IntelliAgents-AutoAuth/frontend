@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, LayoutDashboard, Database, Activity, User, LogOut, FileText, Settings, ShieldCheck, ChevronRight } from 'lucide-react';
 import Logo from '../components/Logo';
 import { casesApi } from '../api/api';
-import { STATUS_MAP } from '../api/mockApi';
 
 const Dashboard = () => {
   const [cases, setCases] = useState([]);
