@@ -58,12 +58,13 @@ const EhrPrefill = () => {
 
     const performSync = async () => {
        try {
-         const data = await casesApi.syncEhr(id);
+         // Stop using syncEhr automatically to save Gemini API calls.
+         // fetchCaseById just returns the data already stored in the DB.
+         const data = await casesApi.fetchCaseById(id);
          setCaseData(data);
          setProgress(100);
        } catch (error) {
-         console.error("EHR Sync Failed:", error);
-         // Fallback logic could go here
+         console.error("Fetch Case Failed:", error);
        } finally {
          setLoading(false);
          clearInterval(timer);
