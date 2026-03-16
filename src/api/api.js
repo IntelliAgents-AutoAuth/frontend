@@ -79,6 +79,10 @@ export const casesApi = {
     const response = await api.post(`/cases/${caseId}/upload`, payload);
     return response.data;
   },
+  bulkUploadGapData: async (caseId, payload) => {
+    const response = await api.post(`/cases/${caseId}/bulk-upload`, payload);
+    return response.data;
+  },
 };
 
 export default api;

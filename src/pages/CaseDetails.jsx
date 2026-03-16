@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, User, Activity, FileText, CheckCircle2, FlaskConical, Building, Calendar, Phone, Fingerprint, ShieldCheck, AlertTriangle, UploadCloud, CheckCircle, RefreshCcw, Loader2 } from 'lucide-react';
+import { ChevronLeft, User, Activity, FileText, CheckCircle2, FlaskConical, Building, Calendar, Phone, Fingerprint, ShieldCheck, AlertTriangle, UploadCloud, CheckCircle, RefreshCcw, Loader2, Sparkles } from 'lucide-react';
 import { casesApi } from '../api/api';
 
 const GapAnalysisModule = ({ caseId, onUpdate }) => {
@@ -10,6 +10,9 @@ const GapAnalysisModule = ({ caseId, onUpdate }) => {
   const [formValues, setFormValues] = useState({});
   const [submitting, setSubmitting] = useState({});
   const [submittingAll, setSubmittingAll] = useState(false);
+  const [submitted, setSubmitted] = useState(false);     // true once all docs uploaded
+  const [pipelineStatus, setPipelineStatus] = useState(null); // tracks post-upload status
+  const navigate = useNavigate();
 
   const fetchAnalysis = async () => {
     try {
@@ -50,24 +53,46 @@ const GapAnalysisModule = ({ caseId, onUpdate }) => {
 
     try {
       setSubmittingAll(true);
-      
-      // Map all submissions to an array of promises
-      const uploadPromises = docsToSubmit.map(doc => {
+
+      // Build payload for bulk-upload endpoint (one atomic request, no race conditions)
+      const bulkPayload = docsToSubmit.map(doc => {
         const value = formValues[doc.document_name];
         const isFile = doc.html_input_type === 'file';
-        const payload = {
+        return {
           document_name: doc.document_name,
           missing_key: doc.document_name,
           [isFile ? 'file_path' : 'field_value']: isFile ? `uploads/${value.name}` : value
         };
-        return casesApi.uploadGapData(caseId, payload);
       });
 
-      await Promise.all(uploadPromises);
-      
-      // Re-trigger sync to let agent verify new data
-      await handleSync();
-      
+      await casesApi.bulkUploadGapData(caseId, bulkPayload);
+
+      // ✅ Documents uploaded — backend will auto-trigger eligibility in background.
+      // Show submitted state and poll for pipeline completion. No LLM re-run needed.
+      setSubmitted(true);
+      setPipelineStatus('PROCESSING');
+
+      // Poll case status every 3s for up to 60s
+      let attempts = 0;
+      const maxAttempts = 20;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const caseData = await casesApi.fetchCaseById(caseId);
+          const st = caseData?.status;
+          if (st === 'APPROVED' || st === 'DENIED' || st === 'ELIGIBLE' || st === 'NOT_ELIGIBLE' || st === 'GAP_ANALYSIS_FAILED') {
+            clearInterval(poll);
+            setPipelineStatus(st);
+            if (onUpdate) onUpdate();
+          } else if (attempts >= maxAttempts) {
+            clearInterval(poll);
+            setPipelineStatus('TIMEOUT');
+          }
+        } catch {
+          // silently ignore transient fetch errors
+        }
+      }, 3000);
+
     } catch (err) {
       console.error("Bulk submission failed:", err);
     } finally {
@@ -85,13 +110,13 @@ const GapAnalysisModule = ({ caseId, onUpdate }) => {
       const isFile = doc.html_input_type === 'file';
       const payload = {
         document_name: doc.document_name,
-        missing_key: doc.document_name, // Map it to the name for ehr_fetcher matching
+        missing_key: doc.document_name,
         [isFile ? 'file_path' : 'field_value']: isFile ? `uploads/${value.name}` : value
       };
 
       await casesApi.uploadGapData(caseId, payload);
-      
-      // Mark as staging complete in local UI
+
+      // Mark field as staged in local UI — backend handles gap checking automatically
       setFormValues(prev => ({ ...prev, [`${doc.document_name}_submitted`]: true }));
       
     } catch (err) {
@@ -103,7 +128,52 @@ const GapAnalysisModule = ({ caseId, onUpdate }) => {
 
   if (loading) return <div className="p-8 text-center text-slate-400 animate-pulse text-xs font-bold uppercase tracking-widest">Aggregating Gaps...</div>;
 
-  if (!analysis || analysis.status === 'GAP_CLEARED' || !analysis.missing_documents || analysis.missing_documents.length === 0) {
+  // ── Submitted / Pipeline Running Banner ────────────────────────────────────
+  if (submitted) {
+    const isDone = pipelineStatus === 'APPROVED' || pipelineStatus === 'DENIED' || pipelineStatus === 'ELIGIBLE' || pipelineStatus === 'NOT_ELIGIBLE';
+    const isFailed = pipelineStatus === 'GAP_ANALYSIS_FAILED' || pipelineStatus === 'TIMEOUT';
+
+    return (
+      <div className={`rounded-3xl p-8 text-center flex flex-col items-center gap-4 border ${
+        isDone ? 'bg-emerald-50 border-emerald-100' : isFailed ? 'bg-rose-50 border-rose-100' : 'bg-blue-50 border-blue-100'
+      }`}>
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${
+          isDone ? 'bg-emerald-500 text-white shadow-emerald-200' : isFailed ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-[#38A3A5] text-white shadow-[#38A3A5]/20'
+        }`}>
+          {isDone ? <CheckCircle size={32} /> : isFailed ? <AlertTriangle size={32} /> : <Sparkles size={32} className="animate-pulse" />}
+        </div>
+        <div>
+          <h3 className={`text-xl font-bold ${
+            isDone ? 'text-emerald-800' : isFailed ? 'text-rose-800' : 'text-slate-900'
+          }`}>
+            {isDone ? 'Pipeline Complete' : isFailed ? 'Processing Issue' : 'Documents Submitted'}
+          </h3>
+          <p className="text-sm text-slate-500 mt-1">
+            {isDone
+              ? `Eligibility verdict: ${pipelineStatus}. Refresh to see full results.`
+              : isFailed
+              ? 'Pipeline encountered an issue. You can manually re-sync.'
+              : 'Running eligibility check in background…'}
+          </p>
+        </div>
+        {!isDone && !isFailed && (
+          <div className="flex items-center gap-2 text-[10px] font-bold text-[#38A3A5] uppercase tracking-widest">
+            <Loader2 size={12} className="animate-spin" /> Processing
+          </div>
+        )}
+        {(isDone || isFailed) && (
+          <button
+            onClick={() => window.location.reload()}
+            className="text-xs font-bold text-[#38A3A5] uppercase tracking-widest hover:underline flex items-center gap-2 mt-1"
+          >
+            <RefreshCcw size={12} /> Refresh Page
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (!analysis?.missing_documents || analysis.missing_documents.length === 0) {
     return (
       <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-8 text-center flex flex-col items-center gap-4">
         <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
