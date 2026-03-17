@@ -48,27 +48,30 @@ const GapAnalysisModule = ({ caseId, onUpdate }) => {
   };
 
   const handleSubmitAll = async () => {
-    const docsToSubmit = analysis.missing_documents.filter(doc => formValues[doc.document_name]);
+    const docsToSubmit = (analysis?.missing_documents || []).filter(doc => {
+      const val = formValues[doc.document_name];
+      return val !== undefined && val !== null && val !== '';
+    });
     if (docsToSubmit.length === 0) return;
 
     try {
       setSubmittingAll(true);
 
-      // Build payload for bulk-upload endpoint (one atomic request, no race conditions)
-      const bulkPayload = docsToSubmit.map(doc => {
+      // Submit each document sequentially using the new file-aware logic
+      // Note: Sequential is used to prevent database race conditions in SQLite
+      for (const doc of docsToSubmit) {
         const value = formValues[doc.document_name];
         const isFile = doc.html_input_type === 'file';
-        return {
+        const payload = {
           document_name: doc.document_name,
           missing_key: doc.document_name,
-          [isFile ? 'file_path' : 'field_value']: isFile ? `uploads/${value.name}` : value
+          file: isFile ? value : null,
+          field_value: isFile ? null : value
         };
-      });
-
-      await casesApi.bulkUploadGapData(caseId, bulkPayload);
+        await casesApi.uploadGapData(caseId, payload);
+      }
 
       // ✅ Documents uploaded — backend will auto-trigger eligibility in background.
-      // Show submitted state and poll for pipeline completion. No LLM re-run needed.
       setSubmitted(true);
       setPipelineStatus('PROCESSING');
 
@@ -111,7 +114,8 @@ const GapAnalysisModule = ({ caseId, onUpdate }) => {
       const payload = {
         document_name: doc.document_name,
         missing_key: doc.document_name,
-        [isFile ? 'file_path' : 'field_value']: isFile ? `uploads/${value.name}` : value
+        file: isFile ? value : null,
+        field_value: isFile ? null : value
       };
 
       await casesApi.uploadGapData(caseId, payload);
@@ -190,7 +194,10 @@ const GapAnalysisModule = ({ caseId, onUpdate }) => {
     );
   }
 
-  const stagedCount = (analysis?.missing_documents || []).filter(doc => formValues[doc.document_name]).length;
+  const stagedCount = (analysis?.missing_documents || []).filter(doc => {
+    const val = formValues[doc.document_name];
+    return val !== undefined && val !== null && val !== '';
+  }).length;
 
   return (
     <div className="space-y-6">

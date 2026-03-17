@@ -4,9 +4,7 @@ const API_BASE_URL = 'http://localhost:8000/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: {},
 });
 
 // Add a request interceptor to add the auth token to every request
@@ -76,7 +74,21 @@ export const casesApi = {
     return response.data;
   },
   uploadGapData: async (caseId, payload) => {
-    const response = await api.post(`/cases/${caseId}/upload`, payload);
+    // We always use the new upload-file endpoint with FormData to handle both files and text fields
+    const formData = new FormData();
+    
+    if (payload.file) {
+      formData.append('file', payload.file);
+    }
+    
+    formData.append('document_name', payload.document_name);
+    formData.append('missing_key', payload.missing_key);
+    
+    if (payload.field_value) {
+      formData.append('field_value', payload.field_value);
+    }
+
+    const response = await api.post(`/cases/${caseId}/upload-file`, formData);
     return response.data;
   },
   bulkUploadGapData: async (caseId, payload) => {
