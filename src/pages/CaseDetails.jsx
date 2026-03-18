@@ -3,15 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, User, Activity, FileText, CheckCircle2, FlaskConical, Building, Calendar, Phone, Fingerprint, ShieldCheck, AlertTriangle, UploadCloud, CheckCircle, RefreshCcw, Loader2, Sparkles } from 'lucide-react';
 import { casesApi } from '../api/api';
 
-const GapAnalysisModule = ({ caseId, onUpdate }) => {
+const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [formValues, setFormValues] = useState({});
   const [submitting, setSubmitting] = useState({});
   const [submittingAll, setSubmittingAll] = useState(false);
-  const [submitted, setSubmitted] = useState(false);     // true once all docs uploaded
-  const [pipelineStatus, setPipelineStatus] = useState(null); // tracks post-upload status
+  const [submitted, setSubmitted] = useState(false);     
+  const [pipelineStatus, setPipelineStatus] = useState(initialStatus); 
   const navigate = useNavigate();
 
   const fetchAnalysis = async () => {
@@ -131,6 +131,96 @@ const GapAnalysisModule = ({ caseId, onUpdate }) => {
   };
 
   if (loading) return <div className="p-8 text-center text-slate-400 animate-pulse text-xs font-bold uppercase tracking-widest">Aggregating Gaps...</div>;
+
+  // ── Final Package / Submission Module ───────────────────────────────────────
+  const isPacketReady = onUpdate && (pipelineStatus === 'PACKET_READY' || pipelineStatus === 'PENDING_APPROVAL');
+  const isSubmitted = pipelineStatus === 'SUBMITTED' || pipelineStatus === 'TRACKING';
+
+  const handlePreview = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(casesApi.previewPaPackage(caseId), {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Preview failed");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      alert("Could not load PDF preview. Make sure the packet has been generated.");
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    try {
+      setSyncing(true); // Reuse syncing state for submission button loader
+      await casesApi.submitCase(caseId);
+      setPipelineStatus('SUBMITTED');
+      
+      // Poll for TRACKING status
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const caseData = await casesApi.fetchCaseById(caseId);
+          if (caseData.status === 'TRACKING' || attempts >= 10) {
+            clearInterval(poll);
+            setPipelineStatus(caseData.status);
+            if (onUpdate) onUpdate();
+          }
+        } catch {}
+      }, 2000);
+      
+    } catch (err) {
+      console.error("Submission failed:", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  if (isPacketReady || isSubmitted) {
+    return (
+      <div className={`rounded-3xl p-8 text-center flex flex-col items-center gap-4 border ${
+        isSubmitted ? 'bg-emerald-50 border-emerald-100' : 'bg-[#38A3A5]/5 border-[#38A3A5]/20'
+      }`}>
+        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${
+          isSubmitted ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-[#38A3A5] text-white shadow-[#38A3A5]/20'
+        }`}>
+          {isSubmitted ? <CheckCircle size={32} /> : <FileText size={32} />}
+        </div>
+        <div>
+          <h3 className={`text-xl font-bold ${isSubmitted ? 'text-emerald-800' : 'text-slate-900'}`}>
+            {isSubmitted ? 'Case Submitted' : 'PA Package Ready'}
+          </h3>
+          <p className="text-sm text-slate-500 mt-1 max-w-md">
+            {isSubmitted 
+              ? 'The package has been transmitted to the payer portal. Status is being tracked.'
+              : 'The medical necessity package and clinical checklist have been generated and merged with your clinical uploads.'}
+          </p>
+        </div>
+        
+        <div className="flex flex-wrap items-center justify-center gap-3 w-full mt-2">
+          <button 
+            onClick={handlePreview}
+            className="flex items-center gap-2 px-6 py-2.5 bg-white text-[#38A3A5] border border-[#38A3A5] rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-all font-outfit"
+          >
+            <FileText size={14} /> Preview Package
+          </button>
+          
+          {!isSubmitted && (
+            <button 
+              onClick={handleFinalSubmit}
+              disabled={syncing}
+              className="flex items-center gap-2 px-6 py-2.5 bg-[#38A3A5] text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-[#2D8284] transition-all font-outfit shadow-lg shadow-[#38A3A5]/20"
+            >
+              {syncing ? <Loader2 size={14} className="animate-spin" /> : <ChevronLeft size={14} className="rotate-180" />}
+              Approve & Submit to Insurance
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // ── Submitted / Pipeline Running Banner ────────────────────────────────────
   if (submitted) {
@@ -467,6 +557,7 @@ const CaseDetails = () => {
             {/* NEW: Gap Analysis Integration */}
             <GapAnalysisModule 
               caseId={id} 
+              initialStatus={caseData.status}
               onUpdate={() => {
                 // Trigger a re-fetch of the main case data if needed
                 window.location.reload(); 

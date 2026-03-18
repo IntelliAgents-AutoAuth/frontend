@@ -95,6 +95,13 @@ export const casesApi = {
     const response = await api.post(`/cases/${caseId}/bulk-upload`, payload);
     return response.data;
   },
+  previewPaPackage: (caseId) => {
+    return `${API_BASE_URL}/cases/${caseId}/preview`;
+  },
+  submitCase: async (caseId) => {
+    const response = await api.post(`/cases/${caseId}/submit`);
+    return response.data;
+  },
 };
 
 export default api;
