@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, User, Activity, FileText, CheckCircle2, FlaskConical, Building, Calendar, Phone, Fingerprint, ShieldCheck, AlertTriangle, UploadCloud, CheckCircle, RefreshCcw, Loader2, Sparkles } from 'lucide-react';
+import { ChevronLeft, User, Activity, FileText, CheckCircle2, FlaskConical, Building, Calendar, Phone, Fingerprint, ShieldCheck, AlertTriangle, UploadCloud, CheckCircle, RefreshCcw, Loader2, Sparkles, PlusCircle } from 'lucide-react';
 import { casesApi } from '../api/api';
 
 const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
@@ -10,8 +10,8 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
   const [formValues, setFormValues] = useState({});
   const [submitting, setSubmitting] = useState({});
   const [submittingAll, setSubmittingAll] = useState(false);
-  const [submitted, setSubmitted] = useState(false);     
-  const [pipelineStatus, setPipelineStatus] = useState(initialStatus); 
+  const [submitted, setSubmitted] = useState(false);
+  const [pipelineStatus, setPipelineStatus] = useState(initialStatus);
   const navigate = useNavigate();
 
   const fetchAnalysis = async () => {
@@ -57,8 +57,6 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
     try {
       setSubmittingAll(true);
 
-      // Submit each document sequentially using the new file-aware logic
-      // Note: Sequential is used to prevent database race conditions in SQLite
       for (const doc of docsToSubmit) {
         const value = formValues[doc.document_name];
         const isFile = doc.html_input_type === 'file';
@@ -71,11 +69,9 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
         await casesApi.uploadGapData(caseId, payload);
       }
 
-      // ✅ Documents uploaded — backend will auto-trigger eligibility in background.
       setSubmitted(true);
       setPipelineStatus('PROCESSING');
 
-      // Poll case status every 3s for up to 60s
       let attempts = 0;
       const maxAttempts = 20;
       const poll = setInterval(async () => {
@@ -92,7 +88,6 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
             setPipelineStatus('TIMEOUT');
           }
         } catch {
-          // silently ignore transient fetch errors
         }
       }, 3000);
 
@@ -109,7 +104,7 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
 
     try {
       setSubmitting(prev => ({ ...prev, [doc.document_name]: true }));
-      
+
       const isFile = doc.html_input_type === 'file';
       const payload = {
         document_name: doc.document_name,
@@ -119,10 +114,8 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
       };
 
       await casesApi.uploadGapData(caseId, payload);
-
-      // Mark field as staged in local UI — backend handles gap checking automatically
       setFormValues(prev => ({ ...prev, [`${doc.document_name}_submitted`]: true }));
-      
+
     } catch (err) {
       console.error("Submission failed:", err);
     } finally {
@@ -130,9 +123,8 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-slate-400 animate-pulse text-xs font-bold uppercase tracking-widest">Aggregating Gaps...</div>;
+  if (loading) return <div className="p-8 text-center text-slate-400 animate-pulse text-[10px] font-bold uppercase tracking-widest">Evaluating Gaps...</div>;
 
-  // ── Final Package / Submission Module ───────────────────────────────────────
   const isPacketReady = onUpdate && (pipelineStatus === 'PACKET_READY' || pipelineStatus === 'PENDING_APPROVAL');
   const isSubmitted = pipelineStatus === 'SUBMITTED' || pipelineStatus === 'TRACKING';
 
@@ -153,11 +145,10 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
 
   const handleFinalSubmit = async () => {
     try {
-      setSyncing(true); // Reuse syncing state for submission button loader
+      setSyncing(true);
       await casesApi.submitCase(caseId);
       setPipelineStatus('SUBMITTED');
-      
-      // Poll for TRACKING status
+
       let attempts = 0;
       const poll = setInterval(async () => {
         attempts++;
@@ -168,9 +159,9 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
             setPipelineStatus(caseData.status);
             if (onUpdate) onUpdate();
           }
-        } catch {}
+        } catch { }
       }, 2000);
-      
+
     } catch (err) {
       console.error("Submission failed:", err);
     } finally {
@@ -180,41 +171,39 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
 
   if (isPacketReady || isSubmitted) {
     return (
-      <div className={`rounded-3xl p-8 text-center flex flex-col items-center gap-4 border ${
-        isSubmitted ? 'bg-emerald-50 border-emerald-100' : 'bg-[#38A3A5]/5 border-[#38A3A5]/20'
-      }`}>
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${
-          isSubmitted ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-[#38A3A5] text-white shadow-[#38A3A5]/20'
+      <div className={`rounded-2xl p-6 text-center flex flex-col items-center gap-3 border ${isSubmitted ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-slate-200 shadow-sm'
         }`}>
-          {isSubmitted ? <CheckCircle size={32} /> : <FileText size={32} />}
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${isSubmitted ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-[#38A3A5] text-white shadow-[#38A3A5]/20'
+          }`}>
+          {isSubmitted ? <CheckCircle size={24} /> : <FileText size={24} />}
         </div>
         <div>
-          <h3 className={`text-xl font-bold ${isSubmitted ? 'text-emerald-800' : 'text-slate-900'}`}>
+          <h3 className={`text-lg font-bold ${isSubmitted ? 'text-emerald-800' : 'text-slate-900'}`}>
             {isSubmitted ? 'Case Submitted' : 'PA Package Ready'}
           </h3>
-          <p className="text-sm text-slate-500 mt-1 max-w-md">
-            {isSubmitted 
-              ? 'The package has been transmitted to the payer portal. Status is being tracked.'
-              : 'The medical necessity package and clinical checklist have been generated and merged with your clinical uploads.'}
+          <p className="text-xs text-slate-500 mt-1 max-w-sm">
+            {isSubmitted
+              ? 'Transmitted to payer portal. Status is being tracked.'
+              : 'Medical necessity package generated and merged with clinical uploads.'}
           </p>
         </div>
-        
+
         <div className="flex flex-wrap items-center justify-center gap-3 w-full mt-2">
-          <button 
+          <button
             onClick={handlePreview}
-            className="flex items-center gap-2 px-6 py-2.5 bg-white text-[#38A3A5] border border-[#38A3A5] rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-all font-outfit"
+            className="flex items-center gap-2 px-5 py-2.5 bg-white text-[#38A3A5] border border-[#38A3A5] rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all focus:outline-none"
           >
-            <FileText size={14} /> Preview Package
+            <FileText size={14} /> Preview Policy
           </button>
-          
+
           {!isSubmitted && (
-            <button 
+            <button
               onClick={handleFinalSubmit}
               disabled={syncing}
-              className="flex items-center gap-2 px-6 py-2.5 bg-[#38A3A5] text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-[#2D8284] transition-all font-outfit shadow-lg shadow-[#38A3A5]/20"
+              className="flex items-center gap-2 px-5 py-2.5 bg-[#38A3A5] text-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-[#2D8284] transition-all shadow-md shadow-[#38A3A5]/20 focus:outline-none disabled:opacity-70"
             >
               {syncing ? <Loader2 size={14} className="animate-spin" /> : <ChevronLeft size={14} className="rotate-180" />}
-              Approve & Submit to Insurance
+              Approve Submit
             </button>
           )}
         </div>
@@ -222,45 +211,36 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
     );
   }
 
-  // ── Submitted / Pipeline Running Banner ────────────────────────────────────
   if (submitted) {
     const isDone = pipelineStatus === 'APPROVED' || pipelineStatus === 'DENIED' || pipelineStatus === 'ELIGIBLE' || pipelineStatus === 'NOT_ELIGIBLE';
     const isFailed = pipelineStatus === 'GAP_ANALYSIS_FAILED' || pipelineStatus === 'TIMEOUT';
 
     return (
-      <div className={`rounded-3xl p-8 text-center flex flex-col items-center gap-4 border ${
-        isDone ? 'bg-emerald-50 border-emerald-100' : isFailed ? 'bg-rose-50 border-rose-100' : 'bg-blue-50 border-blue-100'
-      }`}>
-        <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${
-          isDone ? 'bg-emerald-500 text-white shadow-emerald-200' : isFailed ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-[#38A3A5] text-white shadow-[#38A3A5]/20'
+      <div className={`rounded-2xl p-6 text-center flex flex-col items-center gap-3 border ${isDone ? 'bg-emerald-50 border-emerald-100' : isFailed ? 'bg-rose-50 border-rose-100' : 'bg-blue-50 border-blue-100'
         }`}>
-          {isDone ? <CheckCircle size={32} /> : isFailed ? <AlertTriangle size={32} /> : <Sparkles size={32} className="animate-pulse" />}
+        <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg ${isDone ? 'bg-emerald-500 text-white shadow-emerald-200' : isFailed ? 'bg-rose-500 text-white shadow-rose-200' : 'bg-[#38A3A5] text-white shadow-[#38A3A5]/20'
+          }`}>
+          {isDone ? <CheckCircle size={24} /> : isFailed ? <AlertTriangle size={24} /> : <Sparkles size={24} className="animate-pulse" />}
         </div>
         <div>
-          <h3 className={`text-xl font-bold ${
-            isDone ? 'text-emerald-800' : isFailed ? 'text-rose-800' : 'text-slate-900'
-          }`}>
-            {isDone ? 'Pipeline Complete' : isFailed ? 'Processing Issue' : 'Documents Submitted'}
+          <h3 className={`text-sm font-bold ${isDone ? 'text-emerald-800' : isFailed ? 'text-rose-800' : 'text-slate-900'
+            }`}>
+            {isDone ? 'Pipeline Complete' : isFailed ? 'Processing Issue' : 'Documents Active'}
           </h3>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-[11px] text-slate-500 mt-0.5">
             {isDone
-              ? `Eligibility verdict: ${pipelineStatus}. Refresh to see full results.`
+              ? `Verdict: ${pipelineStatus.replace(/_/g, ' ')}.`
               : isFailed
-              ? 'Pipeline encountered an issue. You can manually re-sync.'
-              : 'Running eligibility check in background…'}
+                ? 'Encountered an issue. Manually re-sync available.'
+                : 'Case is being processed.'}
           </p>
         </div>
-        {!isDone && !isFailed && (
-          <div className="flex items-center gap-2 text-[10px] font-bold text-[#38A3A5] uppercase tracking-widest">
-            <Loader2 size={12} className="animate-spin" /> Processing
-          </div>
-        )}
         {(isDone || isFailed) && (
           <button
             onClick={() => window.location.reload()}
-            className="text-xs font-bold text-[#38A3A5] uppercase tracking-widest hover:underline flex items-center gap-2 mt-1"
+            className="text-[10px] font-bold text-[#38A3A5] uppercase tracking-widest hover:underline flex items-center gap-1.5 mt-2 focus:outline-none"
           >
-            <RefreshCcw size={12} /> Refresh Page
+            <RefreshCcw size={12} /> Reload Result
           </button>
         )}
       </div>
@@ -269,16 +249,16 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
 
   if (!analysis?.missing_documents || analysis.missing_documents.length === 0) {
     return (
-      <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-8 text-center flex flex-col items-center gap-4">
-        <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
-           <CheckCircle size={32} />
+      <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-4 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+        <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shrink-0 shadow-sm">
+          <CheckCircle size={20} />
         </div>
-        <div>
-          <h3 className="text-xl font-bold text-slate-900">Authorization Ready</h3>
-          <p className="text-sm text-slate-500 mt-1">All policy requirements have been satisfied.</p>
+        <div className="flex-1">
+          <h3 className="text-sm font-bold text-slate-900">Authorization Ready</h3>
+          <p className="text-xs text-slate-500 mt-0.5">All clinical policy requirements satisfied.</p>
         </div>
-        <button onClick={handleSync} className="text-xs font-bold text-[#38A3A5] uppercase tracking-widest hover:underline flex items-center gap-2">
-          {syncing ? <Loader2 size={12} className="animate-spin"/> : <RefreshCcw size={12}/>} Force Review
+        <button onClick={handleSync} className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm focus:outline-none flex items-center gap-2 shrink-0">
+          {syncing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCcw size={12} />} Review
         </button>
       </div>
     );
@@ -290,105 +270,109 @@ const GapAnalysisModule = ({ caseId, onUpdate, initialStatus }) => {
   }).length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-2 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center">
-            <AlertTriangle size={20} strokeWidth={2.5} />
+          <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+            <AlertTriangle size={16} strokeWidth={2.5} />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-slate-800 tracking-tight">Requirement Gaps</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stagedCount} of {analysis?.missing_documents?.length || 0} prepared</p>
+            <h3 className="text-sm font-bold text-slate-800 tracking-tight">Requirement Gaps</h3>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">{stagedCount} of {analysis?.missing_documents?.length || 0} Ready</p>
           </div>
         </div>
-        
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2">
           {stagedCount > 0 && (
-            <button 
+            <button
               onClick={handleSubmitAll}
               disabled={submittingAll || syncing}
-              className="flex items-center gap-2 px-6 py-2 bg-[#38A3A5] text-white rounded-xl shadow-lg shadow-[#38A3A5]/20 hover:shadow-[#38A3A5]/40 transition-all text-xs font-bold uppercase tracking-widest border border-[#38A3A5]"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#38A3A5] text-white rounded-lg shadow-sm hover:shadow-[#38A3A5]/40 transition-all text-[10px] font-bold uppercase tracking-widest focus:outline-none"
             >
-              {submittingAll ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-              Submit All ({stagedCount})
+              {submittingAll ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+              Submit
             </button>
           )}
-          <button 
+          <button
             onClick={handleSync}
             disabled={syncing || submittingAll}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-600 rounded-xl transition-all text-xs font-bold uppercase tracking-widest"
+            className="flex items-center gap-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-500 rounded-lg transition-all text-[10px] font-bold uppercase tracking-widest focus:outline-none"
           >
-            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCcw size={14} />}
-            Sync Agent
+            {syncing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCcw size={12} />}
+            Sync
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="flex-1 space-y-3 overflow-y-auto pr-2 -mr-2 scrollbar-thin scrollbar-thumb-slate-200">
         {(analysis?.missing_documents || []).map((doc, idx) => (
-          <div key={idx} className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm hover:border-[#38A3A5]/30 transition-all flex flex-col">
-            <div className="mb-4">
-              <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+          <div key={idx} className="bg-slate-50/50 border border-slate-100/80 rounded-xl p-3 sm:p-4 flex flex-col xl:flex-row xl:items-center gap-4 hover:bg-white hover:border-slate-200 transition-colors">
+            {/* Context */}
+            <div className="flex-1 min-w-0">
+              <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5 leading-tight truncate">
                 {doc.label || doc.document_name}
-                {doc.is_mandatory && <span className="text-rose-500">*</span>}
+                {doc.is_mandatory && <span className="text-rose-500 text-lg leading-none">*</span>}
               </h4>
-              <p className="text-[10px] text-slate-400 font-medium mt-1 leading-relaxed">{doc.reason}</p>
+              <p className="text-[10px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">{doc.reason}</p>
             </div>
 
-            <div className="mt-auto space-y-3">
-              {doc.html_input_type === 'file' ? (
-                <div className="relative group">
-                  <input 
-                    type="file" 
-                    id={`file-${idx}`}
-                    className="hidden" 
-                    accept={doc.accept}
-                    onChange={(e) => handleInputChange(doc.document_name, e.target.files[0])}
-                  />
-                  <label 
-                    htmlFor={`file-${idx}`}
-                    className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl p-4 cursor-pointer hover:border-[#38A3A5] hover:bg-slate-50 transition-all group"
+            {/* Input & Action */}
+            <div className="flex items-center gap-2 xl:w-[320px] 2xl:w-[400px] shrink-0">
+              <div className="flex-1">
+                {doc.html_input_type === 'file' ? (
+                  <div className="relative group">
+                    <input
+                      type="file"
+                      id={`file-${idx}`}
+                      className="hidden"
+                      accept={doc.accept}
+                      onChange={(e) => handleInputChange(doc.document_name, e.target.files[0])}
+                    />
+                    <label
+                      htmlFor={`file-${idx}`}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                          handleInputChange(doc.document_name, e.dataTransfer.files[0]);
+                        }
+                      }}
+                      className={`flex flex-row items-center gap-2 border ${formValues[doc.document_name] ? 'border-[#38A3A5] bg-[#38A3A5]/5' : 'border-slate-200 border-dashed hover:border-[#38A3A5] bg-white'} rounded-lg py-1.5 px-3 cursor-pointer transition-all h-[34px] group w-full overflow-hidden`}
+                    >
+                      <UploadCloud size={14} className={`${formValues[doc.document_name] ? 'text-[#38A3A5]' : 'text-slate-400 group-hover:text-[#38A3A5]'} shrink-0`} />
+                      <span className="text-[9px] font-bold text-slate-500 truncate w-full">
+                        {formValues[doc.document_name]?.name || 'Select File'}
+                      </span>
+                    </label>
+                  </div>
+                ) : doc.html_input_type === 'select' ? (
+                  <select
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 h-[34px] text-[11px] font-semibold text-slate-700 focus:outline-none focus:border-[#38A3A5] focus:ring-1 focus:ring-[#38A3A5]/20 shadow-sm"
+                    onChange={(e) => handleInputChange(doc.document_name, e.target.value)}
                   >
-                    <UploadCloud size={20} className="text-slate-300 group-hover:text-[#38A3A5] mb-2" />
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">
-                      {formValues[doc.document_name]?.name || 'Select File'}
-                    </span>
-                  </label>
-                </div>
-              ) : doc.html_input_type === 'textarea' ? (
-                <textarea 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-xs font-medium focus:ring-2 focus:ring-[#38A3A5]/20 focus:outline-none placeholder:text-slate-300"
-                  placeholder={doc.placeholder || 'Enter details...'}
-                  onChange={(e) => handleInputChange(doc.document_name, e.target.value)}
-                />
-              ) : doc.html_input_type === 'select' ? (
-                <select 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs font-bold text-slate-600 focus:outline-none"
-                  onChange={(e) => handleInputChange(doc.document_name, e.target.value)}
-                >
-                  <option value="">Select Option</option>
-                  {doc.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              ) : (
-                <input 
-                  type={doc.html_input_type || 'text'}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs font-bold text-slate-800 placeholder:text-slate-300 focus:outline-none"
-                  placeholder={doc.placeholder || 'Enter value...'}
-                  onChange={(e) => handleInputChange(doc.document_name, e.target.value)}
-                />
-              )}
+                    <option value="">Select Option</option>
+                    {doc.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type={doc.html_input_type || 'text'}
+                    className="w-full bg-white border border-slate-200 rounded-lg px-3 h-[34px] text-[11px] font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#38A3A5] focus:ring-1 focus:ring-[#38A3A5]/20 shadow-sm"
+                    placeholder={doc.placeholder || 'Enter value...'}
+                    onChange={(e) => handleInputChange(doc.document_name, e.target.value)}
+                  />
+                )}
+              </div>
 
-              <button 
+              <button
                 onClick={() => handleSubmitField(doc)}
                 disabled={!formValues[doc.document_name] || submitting[doc.document_name] || formValues[`${doc.document_name}_submitted`]}
-                className={`w-full py-3 transition-all flex items-center justify-center rounded-2xl text-[10px] font-bold uppercase tracking-widest ${
-                  formValues[`${doc.document_name}_submitted`] 
-                  ? 'bg-emerald-500 text-white shadow-emerald-200 cursor-default' 
-                  : 'bg-slate-100 text-slate-400 hover:bg-slate-200 shadow-none disabled:opacity-50'
-                }`}
+                className={`h-[34px] px-3 transition-all flex items-center justify-center rounded-lg text-[9px] font-bold uppercase tracking-widest shrink-0 focus:outline-none ${formValues[`${doc.document_name}_submitted`]
+                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 cursor-default'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900 shadow-sm disabled:opacity-50'
+                  }`}
               >
-                {submitting[doc.document_name] ? <Loader2 size={14} className="animate-spin" /> : (
-                  formValues[`${doc.document_name}_submitted`] ? <div className="flex items-center gap-2"><CheckCircle size={14}/> Staged</div> : 'Confirm Field'
+                {submitting[doc.document_name] ? <Loader2 size={12} className="animate-spin" /> : (
+                  formValues[`${doc.document_name}_submitted`] ? <div className="flex items-center gap-1"><CheckCircle size={12} /> OK</div> : 'Confirm'
                 )}
               </button>
             </div>
@@ -403,19 +387,21 @@ const CaseDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [caseData, setCaseData] = useState(null);
+  const [fullData, setFullData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     document.title = `AutoAuth | Case ${id}`;
-    
+
     const fetchCase = async () => {
       try {
-        const data = await casesApi.fetchCaseById(id);
-        setCaseData(data);
+        const payload = await casesApi.fetchCaseFullDetails(id);
+        setCaseData(payload.case);
+        setFullData(payload);
       } catch (err) {
         console.error("Error fetching case:", err);
-        setError("Failed to load case data. It might not exist or you don't have permission.");
+        setError("Failed to load case data. It might not exist.");
       } finally {
         setLoading(false);
       }
@@ -427,8 +413,8 @@ const CaseDetails = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-        <div className="w-12 h-12 border-4 border-[#38A3A5]/20 border-t-[#38A3A5] rounded-full animate-spin mb-4" />
-        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Decrypting Payload...</p>
+        <div className="w-8 h-8 border-2 border-[#38A3A5]/20 border-t-[#38A3A5] rounded-full animate-spin mb-3" />
+        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Compiling Records...</p>
       </div>
     );
   }
@@ -436,281 +422,211 @@ const CaseDetails = () => {
   if (error || !caseData) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mb-4">
-          <FileText size={24} />
+        <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mb-4">
+          <AlertTriangle size={20} />
         </div>
-        <h2 className="text-xl font-bold text-slate-800 mb-2">Notice: {error}</h2>
-        <button onClick={() => navigate('/dashboard')} className="mt-6 btn-primary px-8 h-12">
-          Return to Dashboard
+        <h2 className="text-sm font-bold text-slate-800 mb-2">Notice: {error}</h2>
+        <button onClick={() => navigate('/dashboard')} className="mt-4 px-6 py-2 bg-[#38A3A5] text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all hover:bg-[#2D8284]">
+          Return Dashboard
         </button>
       </div>
     );
   }
 
+  // Compile valid detailed EHR entries
+  const combinedData = {
+    ...(fullData?.case || {}),
+    ...(fullData?.ehr || {}),
+    ...(fullData?.extracted_data || {})
+  };
+  const ignoreKeys = [
+    'case_id', 'created_at', 'updated_at', 'patient_id', 'patient_first_name',
+    'patient_last_name', 'extracted_id', 'patient_name', 'status', 'gap_result',
+    'uploaded_files', 'audit_log', 'total_required', 'total_matched',
+    'total_missing', 'gap_percentage', 'created_by', 'priority'
+  ];
+  const validEHREntries = Object.entries(combinedData).filter(([k, v]) =>
+    v && typeof v !== 'object' && !ignoreKeys.includes(k)
+  );
+
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-10 font-sans relative overflow-hidden">
-      {/* Premium Background Decor */}
-      <div className="absolute top-0 right-0 w-[40%] h-[70%] bg-gradient-to-bl from-[#38A3A5]/10 to-transparent rounded-bl-full opacity-60 pointer-events-none" />
-      <div className="absolute top-0 left-0 w-[40%] h-[50%] bg-gradient-to-br from-[#2D8284]/10 to-transparent rounded-br-full opacity-50 pointer-events-none" />
-      
-      <div className="max-w-6xl mx-auto relative z-10 flex flex-col min-h-[calc(100vh-80px)]">
-        
+    <div className="min-h-screen bg-[#F8FAFC] p-4 sm:p-6 lg:p-8 font-sans">
+
+      <div className="max-w-[1400px] mx-auto flex flex-col min-h-[calc(100vh-80px)]">
+
         {/* Header Section */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div className="flex items-center gap-4">
-            <button 
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sticky top-0 bg-[#F8FAFC]/90 backdrop-blur-sm z-20 pb-2">
+          <div className="flex items-center gap-3">
+            <button
               onClick={() => navigate('/dashboard')}
-              className="w-11 h-11 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50/80 transition-all"
+              className="w-9 h-9 rounded-lg bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 focus:outline-none transition-colors"
             >
-              <ChevronLeft size={22} strokeWidth={2.5} />
+              <ChevronLeft size={18} strokeWidth={2.5} />
             </button>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-outfit" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              <h1 className="text-xl font-extrabold text-slate-900 tracking-tight font-outfit" style={{ fontFamily: "'Outfit', sans-serif" }}>
                 Case Profile
               </h1>
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-[11px] font-bold text-[#38A3A5] uppercase tracking-widest">{caseData.case_id}</p>
-                <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[10px] font-bold text-[#38A3A5] uppercase tracking-widest">{caseData.case_id}</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1.5 border-l border-slate-300">
                   Priority: {caseData.priority}
-                </p>
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-2">
-               <span className="flex h-2 w-2 relative">
-                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-               </span>
-               <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-widest">{caseData.status.replace('_', ' ')}</span>
+          <div className="flex items-center">
+            <div className="px-3 py-1.5 bg-white rounded-md border border-slate-200 shadow-sm flex items-center gap-2">
+              <span className="flex h-1.5 w-1.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#38A3A5] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#38A3A5]"></span>
+              </span>
+              <span className="text-[9px] font-extrabold text-slate-600 uppercase tracking-widest">{caseData.status.replace(/_/g, ' ')}</span>
             </div>
           </div>
         </header>
 
-        {/* Content Modules */}
-        <main className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 flex-1">
-          
-          {/* Column 1: Patient & Insurance */}
-          <div className="space-y-6 sm:space-y-8">
-            {/* Patient Meta */}
-            <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] relative overflow-hidden group hover:border-[#38A3A5]/30 transition-colors">
-              <div className="absolute top-0 right-0 p-6 text-[#38A3A5]/10 group-hover:text-[#38A3A5]/20 transition-colors pointer-events-none">
-                <User size={80} strokeWidth={1} className="translate-x-4 -translate-y-4" />
-              </div>
-              
-              <div className="mb-6">
-                <div className="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center mb-4">
-                  <Fingerprint size={24} strokeWidth={2} />
-                </div>
-                <h2 className="text-xl font-bold text-slate-900">{caseData.patient_name || 'Patient Name Not Set'}</h2>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">MRN: {caseData.patient_id}</p>
-              </div>
+        {/* 2-Column Dashboard Layout */}
+        <div className="flex flex-col lg:flex-row gap-6 lg:items-start flex-1">
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><Calendar size={12}/> DOB</span>
-                  <p className="text-sm font-semibold text-slate-700">{caseData.date_of_birth || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><User size={12}/> Gender</span>
-                  <p className="text-sm font-semibold text-slate-700">{caseData.gender || 'N/A'}</p>
-                </div>
+          {/* LEFT SIDEBAR: Static Metadata */}
+          <div className="w-full lg:w-[320px] xl:w-[360px] shrink-0 flex flex-col gap-6">
+
+            {/* Patient Header Card */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm relative overflow-hidden flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-xl flex items-center justify-center shrink-0 border border-indigo-100/50">
+                <Fingerprint size={24} strokeWidth={1.5} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-[15px] font-bold text-slate-900 truncate tracking-tight">{caseData.patient_name || 'Anonymous'}</h2>
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">MRN: {caseData.patient_id}</p>
+              </div>
+              <div className="absolute -right-6 -bottom-6 text-slate-50 opacity-50 pointer-events-none">
+                <Fingerprint size={100} strokeWidth={1} />
               </div>
             </div>
 
-            {/* Insurance Info */}
-            <div className="bg-[#38A3A5] rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-lg shadow-[#38A3A5]/20">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full mix-blend-overlay opacity-10 blur-xl pointer-events-none -translate-y-8 translate-x-8" />
-              
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold font-outfit" style={{ fontFamily: "'Outfit', sans-serif" }}>{caseData.insurance_company}</h3>
-                  <p className="text-[11px] font-medium text-white/70 uppercase tracking-widest mt-1">Primary Network</p>
+            {/* Ordering Entity */}
+            {(caseData.physician_name || caseData.facility_name) && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-4 text-violet-600">
+                  <Building size={14} strokeWidth={2.5} />
+                  <h3 className="text-[11px] font-bold tracking-widest uppercase">Ordering Entity</h3>
                 </div>
-                <ShieldCheck size={28} className="text-white/80" strokeWidth={1.5} />
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-white/10 rounded-2xl p-4 border border-white/20 backdrop-blur-sm">
-                  <p className="text-[10px] text-white/60 font-medium uppercase tracking-widest mb-1">Plan Name</p>
-                  <p className="text-sm font-bold tracking-tight">{caseData.plan_name || 'Standard Plan'}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white/10 rounded-2xl p-4 border border-white/20 backdrop-blur-sm">
-                    <p className="text-[10px] text-white/60 font-medium uppercase tracking-widest mb-1">Group No</p>
-                    <p className="text-sm font-bold tracking-tight">{caseData.group_number || 'N/A'}</p>
-                  </div>
-                  <div className="bg-white/10 rounded-2xl p-4 border border-white/20 backdrop-blur-sm">
-                    <p className="text-[10px] text-white/60 font-medium uppercase tracking-widest mb-1">Member ID</p>
-                    <p className="text-sm font-bold tracking-tight">{caseData.member_id || 'N/A'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Column 2 & 3: Clinical & Details */}
-          <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-            
-            {/* NEW: Gap Analysis Integration */}
-            <GapAnalysisModule 
-              caseId={id} 
-              initialStatus={caseData.status}
-              onUpdate={() => {
-                // Trigger a re-fetch of the main case data if needed
-                window.location.reload(); 
-              }} 
-            />
-
-            {/* Clinical Overview */}
-            <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] h-full">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center">
-                  <Activity size={20} strokeWidth={2.5} />
-                </div>
-                <h3 className="text-lg font-bold text-slate-800 tracking-tight">Clinical Blueprint</h3>
-              </div>
-
-              <div className="space-y-8">
-                {/* Diagnosis */}
-                <div className="p-5 bg-slate-50 border border-slate-100/80 rounded-2xl relative">
-                  <span className="absolute -top-3 left-4 bg-white px-3 py-0.5 border border-slate-200 rounded-full text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">
-                    Primary Diagnosis
-                  </span>
-                  <div className="mt-2 flex items-start gap-4">
-                    <div className="w-12 h-12 bg-white border border-slate-200 flex items-center justify-center rounded-xl flex-shrink-0 text-slate-600 font-bold uppercase tracking-widest text-[10px]">
-                      ICD-10
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">{caseData.diagnosis || 'Diagnosis Not Documented'}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                         <span className="text-xs font-bold text-[#38A3A5]">{caseData.icd10_code || 'N/A'}</span>
-                         <span className="text-slate-300">•</span>
-                         <span className="text-[10px] text-slate-400 font-medium tracking-wide">Dated: {caseData.diagnosis_date || 'Unknown'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Procedure */}
-                <div className="p-5 bg-slate-50 border border-slate-100/80 rounded-2xl relative">
-                  <span className="absolute -top-3 left-4 bg-white px-3 py-0.5 border border-slate-200 rounded-full text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">
-                    Requested Procedure
-                  </span>
-                  <div className="mt-2 flex items-start gap-4">
-                    <div className="w-12 h-12 bg-[#38A3A5]/10 border border-[#38A3A5]/20 flex items-center justify-center rounded-xl flex-shrink-0 text-[#38A3A5] font-bold uppercase tracking-widest text-[10px]">
-                      CPT
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">{caseData.procedure_name || 'Procedure Not Documented'}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                         <span className="text-xs font-bold text-[#38A3A5]">{caseData.cpt_code || 'N/A'}</span>
-                         {caseData.procedure_date && (
-                           <>
-                             <span className="text-slate-300">•</span>
-                             <span className="text-[10px] text-slate-400 font-medium tracking-wide">Target: {caseData.procedure_date}</span>
-                           </>
-                         )}
-                         {caseData.place_of_service && (
-                           <>
-                             <span className="text-slate-300">•</span>
-                             <span className="text-[10px] text-slate-400 font-medium tracking-wide">Facility: {caseData.place_of_service}</span>
-                           </>
-                         )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-          
-          {/* Lower Grid: Routing Provider & Lab Data */}
-          <div className="lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 mt-2">
-             
-             {/* Ordering Physician */}
-             {(caseData.physician_name || caseData.physician_npi || caseData.physician_specialty || caseData.facility_name) && (
-             <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)]">
-               <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-500 flex items-center justify-center">
-                    <Building size={20} strokeWidth={2.5} />
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-800 tracking-tight">Ordering Entity</h3>
-               </div>
-               
-               <div className="space-y-4 text-sm font-medium text-slate-600">
+                <div className="space-y-3">
                   {caseData.physician_name && (
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Physician</span>
-                     <span className="font-bold text-slate-800">{caseData.physician_name}</span>
-                  </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">Physician</span>
+                      <span className="text-xs font-semibold text-slate-800">{caseData.physician_name}</span>
+                    </div>
                   )}
                   {caseData.physician_npi && (
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">NPI Number</span>
-                     <span>{caseData.physician_npi}</span>
-                  </div>
-                  )}
-                  {caseData.physician_specialty && (
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Specialty</span>
-                     <span>{caseData.physician_specialty}</span>
-                  </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">NPI Number</span>
+                      <span className="text-xs font-semibold text-slate-800">{caseData.physician_npi}</span>
+                    </div>
                   )}
                   {caseData.facility_name && (
-                  <div className="flex items-center justify-between pb-1">
-                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Facility</span>
-                     <span>{caseData.facility_name}</span>
-                  </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">Facility</span>
+                      <span className="text-xs font-semibold text-slate-800">{caseData.facility_name}</span>
+                    </div>
                   )}
-               </div>
-             </div>
-             )}
+                </div>
+              </div>
+            )}
 
-             {/* Diagnostics / Labs */}
-             {caseData.lab_results && Object.keys(caseData.lab_results).length > 0 && (
-             <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 sm:p-8 border border-white/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] flex flex-col">
-               <div className="flex items-center justify-between mb-6">
-                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-500 flex items-center justify-center">
-                      <FlaskConical size={20} strokeWidth={2.5} />
+            {/* Consolidated EHR List */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col flex-1 max-h-[500px]">
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl flex items-center gap-2">
+                <Activity size={14} className="text-[#38A3A5]" />
+                <h3 className="text-[10px] font-extrabold text-[#38A3A5] uppercase tracking-widest">EHR Details Segment</h3>
+              </div>
+              <div className="overflow-y-auto p-4 space-y-0 scrollbar-thin scrollbar-thumb-slate-200">
+                {validEHREntries.length > 0 ? (
+                  validEHREntries.map(([key, value]) => (
+                    <div key={key} className="flex flex-col py-3 border-b border-slate-50 last:border-0 last:pb-0 first:pt-0 gap-0.5">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{key.replace(/_/g, ' ')}</span>
+                      <span className="text-xs font-semibold text-slate-800">{value}</span>
                     </div>
-                    <h3 className="text-lg font-bold text-slate-800 tracking-tight">Diagnostic Biomarkers</h3>
-                 </div>
-                 <span className="px-3 py-1 bg-slate-50 text-slate-500 rounded-lg border border-slate-200 text-[10px] font-bold uppercase tracking-widest">EHR Synced</span>
-               </div>
-               
-               <div className="flex-1 bg-slate-50/50 rounded-2xl border border-slate-100/80 p-5 overflow-auto max-h-48 scrollbar-hide">
-                  {caseData.lab_results && Object.keys(caseData.lab_results).length > 0 ? (
-                    <div className="space-y-4">
-                      {Object.entries(caseData.lab_results).map(([testLabel, resultsMap]) => (
-                        <div key={testLabel}>
-                           <p className="text-[11px] font-extrabold text-[#38A3A5] uppercase tracking-widest mb-2 border-b border-slate-200 pb-1 inline-block">{testLabel}</p>
-                           <ul className="grid grid-cols-2 gap-x-4 gap-y-2">
-                             {Object.entries(resultsMap).map(([key, value]) => (
-                               <li key={key} className="text-xs flex items-center justify-between">
-                                  <span className="text-slate-500 font-medium">{key}</span>
-                                  <span className="font-bold text-slate-700">{value && typeof value === 'object' ? `${value.value} ${value.unit}` : value}</span>
-                               </li>
-                             ))}
-                           </ul>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2">
-                       <FileText size={24} className="opacity-50" />
-                       <p className="text-xs font-bold uppercase tracking-widest">No diagnostics detected</p>
-                    </div>
-                  )}
-               </div>
-             </div>
-             )}
+                  ))
+                ) : (
+                  <div className="text-center py-6 text-slate-400">
+                    <FileText size={20} className="mx-auto opacity-50 mb-2" />
+                    <span className="text-[9px] font-bold uppercase tracking-widest">No Context Synced</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
-        </main>
+
+          {/* RIGHT MAIN CONTENT: Dynamic Actionable Components */}
+          <div className="flex-1 flex flex-col gap-6 min-w-0">
+
+            {/* Clinical Blueprint Banner */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 hover:border-[#38A3A5]/30 transition-colors">
+                <div className="w-10 h-10 bg-slate-50 text-slate-500 rounded-xl flex items-center justify-center shrink-0 text-[10px] font-extrabold uppercase tracking-widest border border-slate-100">ICD-10</div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    Primary Diagnosis {caseData.icd10_code && <span className="text-[#38A3A5]">{caseData.icd10_code}</span>}
+                  </p>
+                  <p className="text-sm font-bold text-slate-800 truncate mt-0.5">{caseData.diagnosis || 'Unspecified'}</p>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 hover:border-[#38A3A5]/30 transition-colors">
+                <div className="w-10 h-10 bg-[#38A3A5]/10 text-[#38A3A5] rounded-xl flex items-center justify-center shrink-0 text-[10px] font-extrabold uppercase tracking-widest border border-[#38A3A5]/20">CPT</div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    Req Procedure {caseData.cpt_code && <span className="text-[#38A3A5]">{caseData.cpt_code}</span>}
+                  </p>
+                  <p className="text-sm font-bold text-slate-800 truncate mt-0.5">{caseData.procedure_name || 'Unspecified'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Gap Analysis List View */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col max-h-[800px]">
+              <GapAnalysisModule
+                caseId={id}
+                initialStatus={caseData.status}
+                onUpdate={() => window.location.reload()}
+              />
+            </div>
+
+            {/* Diagnostics Tracker Mode */}
+            {caseData.lab_results && Object.keys(caseData.lab_results).length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
+                <div className="flex items-center gap-2 mb-5">
+                  <FlaskConical size={16} className="text-cyan-500" />
+                  <h3 className="text-[11px] font-extrabold text-slate-800 tracking-widest uppercase">Diagnostic Biomarkers</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {Object.entries(caseData.lab_results).map(([testLabel, resultsMap]) => (
+                    <div key={testLabel} className="bg-slate-50 border border-slate-100 rounded-xl p-3 border-l-2 border-l-cyan-400">
+                      <p className="text-[9px] font-extrabold text-cyan-700 uppercase tracking-widest mb-2 flex items-center gap-1">
+                        <CheckCircle2 size={10} /> {testLabel}
+                      </p>
+                      <ul className="space-y-1.5">
+                        {Object.entries(resultsMap).map(([key, value]) => (
+                          <li key={key} className="flex justify-between items-center text-xs">
+                            <span className="text-[10px] text-slate-500 truncate mr-2">{key}</span>
+                            <span className="font-bold text-slate-700">{value && typeof value === 'object' ? `${value.value} ${value.unit}` : value}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+
+        </div>
       </div>
     </div>
   );

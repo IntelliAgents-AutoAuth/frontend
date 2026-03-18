@@ -61,6 +61,10 @@ export const casesApi = {
     const response = await api.get(`/cases/${caseId}`);
     return response.data;
   },
+  fetchCaseFullDetails: async (caseId) => {
+    const response = await api.get(`/cases/${caseId}/full-details`);
+    return response.data;
+  },
   createCase: async (payload) => {
     const response = await api.post('/cases', payload);
     return response.data;
