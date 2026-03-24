@@ -388,6 +388,7 @@ const CaseDetails = () => {
   const navigate = useNavigate();
   const [caseData, setCaseData] = useState(null);
   const [fullData, setFullData] = useState(null);
+  const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -396,9 +397,13 @@ const CaseDetails = () => {
 
     const fetchCase = async () => {
       try {
-        const payload = await casesApi.fetchCaseFullDetails(id);
+        const [payload, logs] = await Promise.all([
+          casesApi.fetchCaseFullDetails(id),
+          casesApi.fetchAuditLog(id).catch(() => [])
+        ]);
         setCaseData(payload.case);
         setFullData(payload);
+        setAuditLog(logs);
       } catch (err) {
         console.error("Error fetching case:", err);
         setError("Failed to load case data. It might not exist.");
@@ -448,6 +453,36 @@ const CaseDetails = () => {
   const validEHREntries = Object.entries(combinedData).filter(([k, v]) =>
     v && typeof v !== 'object' && !ignoreKeys.includes(k)
   );
+
+  const agentSummary = [];
+  if (auditLog && auditLog.length > 0) {
+    const grouped = {};
+    auditLog.forEach(log => {
+      const agent = log.agent_name || 'System';
+      if (!grouped[agent]) {
+        grouped[agent] = {
+          agent_name: agent,
+          start_time: log.timestamp,
+          end_time: log.timestamp,
+          status: log.status
+        };
+      } else {
+        if (new Date(log.timestamp) < new Date(grouped[agent].start_time)) {
+          grouped[agent].start_time = log.timestamp;
+        }
+        if (new Date(log.timestamp) > new Date(grouped[agent].end_time)) {
+          grouped[agent].end_time = log.timestamp;
+          if (log.status === 'ERROR' || log.status === 'FAILED') {
+            grouped[agent].status = log.status;
+          } else if (grouped[agent].status !== 'ERROR' && grouped[agent].status !== 'FAILED') {
+            grouped[agent].status = log.status;
+          }
+        }
+      }
+    });
+    Object.values(grouped).forEach(g => agentSummary.push(g));
+    agentSummary.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-4 sm:p-6 lg:p-8 font-sans">
@@ -623,6 +658,45 @@ const CaseDetails = () => {
                 </div>
               </div>
             )}
+
+            {/* Agent Execution Summary */}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6 mb-8">
+              <div className="flex items-center gap-2 mb-5">
+                <ShieldCheck size={16} className="text-[#38A3A5]" />
+                <h3 className="text-[11px] font-extrabold text-slate-800 tracking-widest uppercase">Agent Execution Summary</h3>
+              </div>
+              <div className="space-y-4">
+                {agentSummary && agentSummary.length > 0 ? (
+                  agentSummary.map((summary, index) => (
+                    <div key={index} className="flex gap-4 p-4 border border-slate-100 rounded-xl bg-slate-50/50 hover:bg-white hover:border-slate-200 transition-colors">
+                      <div className="flex flex-col items-center justify-center shrink-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${summary.status === 'ERROR' || summary.status === 'FAILED' ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                           <ShieldCheck size={18} />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-bold text-slate-800 mb-2 truncate">{summary.agent_name}</h4>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs font-semibold text-slate-600">
+                           <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Started:</span>
+                              {new Date(summary.start_time).toLocaleTimeString()}
+                           </div>
+                           <div className="hidden sm:block w-px h-3 bg-slate-300"></div>
+                           <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ended:</span>
+                              {summary.start_time !== summary.end_time ? new Date(summary.end_time).toLocaleTimeString() : 'In Progress'}
+                           </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-6 text-slate-400 border border-slate-100 rounded-xl bg-slate-50 border-dashed">
+                    <span className="text-[10px] font-bold uppercase tracking-widest">No Agent Logs Found</span>
+                  </div>
+                )}
+              </div>
+            </div>
 
           </div>
 
