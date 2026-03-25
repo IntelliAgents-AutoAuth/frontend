@@ -86,9 +86,9 @@ const Dashboard = () => {
             <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
             <span className="font-semibold">Dashboard</span>
           </div>
-          <div className="sidebar-link group cursor-pointer hover:bg-slate-50">
+          <div className="sidebar-link group cursor-pointer hover:bg-slate-50" onClick={() => navigate('/cases-data')}>
             <Activity size={20} className="group-hover:rotate-12 transition-transform" />
-            <span>Active Pipeline</span>
+            <span>Cases Data</span>
           </div>
           <div className="sidebar-link group cursor-pointer hover:bg-slate-50">
             <FileText size={20} className="group-hover:-translate-y-0.5 transition-transform" />
