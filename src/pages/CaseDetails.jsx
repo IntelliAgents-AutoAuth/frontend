@@ -1,3 +1,24 @@
+/**
+ * CaseDetails.jsx — Interactive Case Workspace
+ * ============================================
+ * 
+ * This is the most complex frontend component in the IntelliAgents platform. 
+ * It acts as the primary interface for the CaseOrchestrator, allowing 
+ * healthcare providers to interact with the AI agents in real-time.
+ *
+ * Key Modules:
+ * ------------
+ * 1. **GapAnalysisModule**: A sub-component that renders the 'Gaps' 
+ *    identified by the AI and provides specialized inputs (File/Select/Text) 
+ *    to resolve them.
+ * 2. **State Machine Integration**: Uses a polling mechanism to reflect 
+ *    the backend status (e.g., GAP_ANALYSIS_RUNNING -> GAP_FOUND).
+ * 3. **AI Confidence Badge**: Displays the LLM's certainty score for 
+ *    the current clinical determination.
+ * 4. **Packet Management**: Handles the preview and submission of 
+ *    the generated Prior Auth PDF package.
+ */
+
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -30,6 +51,13 @@ const GapAnalysisModule = ({
   initialStatus,
   onAnalysisUpdate,
 }) => {
+  /**
+   * The GapAnalysisModule specializes in resolving 'Missing Documents'.
+   * 
+   * It transforms the structured JSON output from the Gap Analysis Agent 
+   * into a set of interactive forms. When a user provides a missing 
+   * document, it triggers a 'SYNC' event to the Orchestrator.
+   */
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);

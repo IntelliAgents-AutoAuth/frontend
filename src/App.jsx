@@ -1,3 +1,22 @@
+/**
+ * App.jsx — Frontend Entry Point & Routing
+ * ========================================
+ * 
+ * This is the main shell of the IntelliAgents React application.
+ * It defines the client-side routing structure using 'react-router-dom', 
+ * ensuring that users can navigate between the Login, Dashboard, 
+ * and Case-specific views.
+ *
+ * Core Routes:
+ * ------------
+ * /login             : User authentication.
+ * /dashboard         : Main overview of all cases and status cards.
+ * /new-case          : Form to start a new Prior Authorization request.
+ * /cases/:id/prefill : EHR data extraction and patient review.
+ * /cases/:id         : Interactive case view (Orchestrator interface).
+ * /pa-status         : Real-time monitoring of payer outcomes.
+ */
+
 import React from "react";
 import {
   BrowserRouter as Router,

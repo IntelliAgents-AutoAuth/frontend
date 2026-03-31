@@ -1,3 +1,23 @@
+/**
+ * Dashboard.jsx — Main Case Management Interface
+ * =============================================
+ * 
+ * This page serves as the primary workspace for healthcare providers.
+ * It provides a high-level overview of all Prior Authorization (PA) cases, 
+ * showing their current status, patient details, and required actions.
+ *
+ * Core Functionality:
+ * -------------------
+ * 1. **Authentication Guard**: Verifies that a user is logged in and that 
+ *    their JWT token has not expired before allowing access.
+ * 2. **Data Fetching**: Communicates with the 'casesApi' to retrieve 
+ *    the latest case data from the backend.
+ * 3. **Dynamic Status Mapping**: Color-codes cases based on their lifecycle 
+ *    stage (e.g., APPROVED, SUBMITTED, DENIED).
+ * 4. **Navigation Dispatcher**: Allows users to drill down into specific 
+ *    case details or initiate sub-workflows like 'New Case'.
+ */
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, LayoutDashboard, Database, Activity, User, LogOut, FileText, Settings, ShieldCheck, ChevronRight } from 'lucide-react';
